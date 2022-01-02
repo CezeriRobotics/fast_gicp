@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(fast_gicp)
 
-option(BUILD_VGICP_CUDA "Build GPU-powered VGICP" OFF)
+option(BUILD_VGICP_CUDA "Build GPU-powered VGICP" ON)
 option(BUILD_apps "Build application programs" ON)
 option(BUILD_test "Build test programs" OFF)
 option(BUILD_PYTHON_BINDINGS "Build python bindings" OFF)
@@ -18,9 +18,7 @@ set(CMAKE_BUILD_TYPE "Release")
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-if(NOT BUILD_PYTHON_BINDINGS)
-  find_package(catkin)
-endif()
+find_package(ament_cmake_auto REQUIRED)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -28,32 +26,25 @@ if (OPENMP_FOUND)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-if(BUILD_VGICP_CUDA)
-  find_package(CUDA REQUIRED)
+find_package(CUDA)
+if (CUDA_FOUND)
   include_directories(${CUDA_INCLUDE_DIRS})
   link_directories(${CUDA_LIBRARY_DIRS})
 endif()
 
-###################################
-## catkin specific configuration ##
-###################################
-if(catkin_FOUND)
-  catkin_package(
-    INCLUDE_DIRS include
-    LIBRARIES fast_gicp
-  )
-endif()
+ament_auto_find_build_dependencies()
 
 ###########
 ## Build ##
 ###########
 
-add_library(fast_gicp SHARED
+ament_auto_add_library(fast_gicp SHARED
   src/fast_gicp/gicp/lsq_registration.cpp
   src/fast_gicp/gicp/fast_gicp.cpp
   src/fast_gicp/gicp/fast_gicp_st.cpp
   src/fast_gicp/gicp/fast_vgicp.cpp
 )
+
 target_link_libraries(fast_gicp
   ${PCL_LIBRARIES}
 )
@@ -97,7 +88,7 @@ if(BUILD_PYTHON_BINDINGS)
 endif()
 
 ### CUDA ###
-if(BUILD_VGICP_CUDA)
+if(CUDA_FOUND)
   set(CUDA_NVCC_FLAGS "--expt-relaxed-constexpr")
   add_definitions(-DUSE_VGICP_CUDA)
 
@@ -118,11 +109,8 @@ if(BUILD_VGICP_CUDA)
     include
     thirdparty/Eigen
     thirdparty/nvbio
-    ${catkin_INCLUDE_DIRS}
   )
-  target_link_libraries(fast_vgicp_cuda
-    ${catkin_LIBRARIES}
-  )
+  target_link_libraries(fast_vgicp_cuda)
   cuda_add_cublas_to_target(fast_vgicp_cuda)
 
   # add vgicp_cuda to libfast_gicp
@@ -134,10 +122,8 @@ if(BUILD_VGICP_CUDA)
     fast_vgicp_cuda
   )
   add_dependencies(fast_gicp fast_vgicp_cuda)
-  if(catkin_FOUND)
-    install(TARGETS fast_vgicp_cuda  
-      LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
-  endif()
+  install(TARGETS fast_vgicp_cuda  
+      LIBRARY DESTINATION "lib")
 endif()
 
 ### TEST ###
@@ -150,11 +136,4 @@ if(BUILD_test)
   gtest_add_tests(TARGET gicp_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} EXTRA_ARGS "${CMAKE_SOURCE_DIR}/data")
 endif()
 
-if(catkin_FOUND)
-  install(TARGETS ${PROJECT_NAME}
-    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
-  
-  install(DIRECTORY include/
-    DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
-    FILES_MATCHING PATTERN "*.hpp")
-endif()
+ament_auto_package(INSTALL_TO_SHARE)

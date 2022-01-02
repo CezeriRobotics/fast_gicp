@@ -30,6 +30,9 @@ void test_pcl(Registration& reg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr&
   reg.setInputTarget(target);
   reg.setInputSource(source);
   reg.align(*aligned);
+    Eigen::Matrix4f trans = reg.getFinalTransformation();
+        Eigen::Vector3f pose(trans.block<3, 1>(0, 3));
+        std::cout << "pose: " << pose << std::endl;
   auto t2 = std::chrono::high_resolution_clock::now();
   fitness_score = reg.getFitnessScore();
   double single = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1e6;
@@ -63,6 +66,9 @@ void test(Registration& reg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& tar
   reg.setInputTarget(target);
   reg.setInputSource(source);
   reg.align(*aligned);
+    Eigen::Matrix4f trans = reg.getFinalTransformation();
+        Eigen::Vector3f pose(trans.block<3, 1>(0, 3));
+        std::cout << "pose: " << pose << std::endl;
   auto t2 = std::chrono::high_resolution_clock::now();
   fitness_score = reg.getFitnessScore();
   double single = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1e6;
@@ -148,48 +154,16 @@ int main(int argc, char** argv) {
 
   std::cout << "target:" << target_cloud->size() << "[pts] source:" << source_cloud->size() << "[pts]" << std::endl;
 
-  std::cout << "--- pcl_gicp ---" << std::endl;
-  pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> pcl_gicp;
-  test_pcl(pcl_gicp, target_cloud, source_cloud);
-
-  std::cout << "--- pcl_ndt ---" << std::endl;
-  pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> pcl_ndt;
-  pcl_ndt.setResolution(1.0);
-  test_pcl(pcl_ndt, target_cloud, source_cloud);
 
   std::cout << "--- fgicp_st ---" << std::endl;
   fast_gicp::FastGICPSingleThread<pcl::PointXYZ, pcl::PointXYZ> fgicp_st;
   test(fgicp_st, target_cloud, source_cloud);
 
-  std::cout << "--- fgicp_mt ---" << std::endl;
-  fast_gicp::FastGICP<pcl::PointXYZ, pcl::PointXYZ> fgicp_mt;
-  // fast_gicp uses all the CPU cores by default
-  // fgicp_mt.setNumThreads(8);
-  test(fgicp_mt, target_cloud, source_cloud);
 
-  std::cout << "--- vgicp_st ---" << std::endl;
-  fast_gicp::FastVGICP<pcl::PointXYZ, pcl::PointXYZ> vgicp;
-  vgicp.setResolution(1.0);
-  vgicp.setNumThreads(1);
-  test(vgicp, target_cloud, source_cloud);
-
-  std::cout << "--- vgicp_mt ---" << std::endl;
-  vgicp.setNumThreads(omp_get_max_threads());
-  test(vgicp, target_cloud, source_cloud);
-
-#ifdef USE_VGICP_CUDA
-  std::cout << "--- ndt_cuda (P2D) ---" << std::endl;
-  fast_gicp::NDTCuda<pcl::PointXYZ, pcl::PointXYZ> ndt_cuda;
-  ndt_cuda.setResolution(1.0);
-  ndt_cuda.setDistanceMode(fast_gicp::NDTDistanceMode::P2D);
-  test(ndt_cuda, target_cloud, source_cloud);
-
-  std::cout << "--- ndt_cuda (D2D) ---" << std::endl;
-  ndt_cuda.setDistanceMode(fast_gicp::NDTDistanceMode::D2D);
-  test(ndt_cuda, target_cloud, source_cloud);
 
   std::cout << "--- vgicp_cuda (parallel_kdtree) ---" << std::endl;
   fast_gicp::FastVGICPCuda<pcl::PointXYZ, pcl::PointXYZ> vgicp_cuda;
+  //vgicp_cuda.set_neighbor_search_method(fast_gicp::NeighborSearchMethod::DIRECT7, 0.0);
   vgicp_cuda.setResolution(1.0);
   // vgicp_cuda uses CPU-based parallel KDTree in covariance estimation by default
   // on a modern CPU, it is faster than GPU_BRUTEFORCE
@@ -209,7 +183,6 @@ int main(int argc, char** argv) {
   // kernel width (and distance threshold) need to be tuned
   vgicp_cuda.setKernelWidth(0.5);
   test(vgicp_cuda, target_cloud, source_cloud);
-#endif
 
   return 0;
 }
