@@ -89,7 +89,7 @@ endif()
 
 ### CUDA ###
 if(CUDA_FOUND)
-  set(CUDA_NVCC_FLAGS "--expt-relaxed-constexpr")
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3 -gencode arch=compute_50,code=sm_50)
   add_definitions(-DUSE_VGICP_CUDA)
 
   cuda_add_library(fast_vgicp_cuda SHARED
